@@ -1,0 +1,7 @@
+# API Configuration
+API_BASE_URL = "https://api.example.com/routes/"  # Replace with your API base URL
+API_KEY = "your-api-key-here"  # Replace with your API key
+
+# Proxy Configuration
+PROXY_HOST = "127.0.0.1"  # Replace with your proxy host if needed
+PROXY_PORT = 8989  # Replace with your proxy port if needed 

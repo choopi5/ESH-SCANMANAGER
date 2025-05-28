@@ -1,0 +1,27 @@
+# Configuration files with secrets
+config.py
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environment
+venv/
+env/
+.env/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo 
+api_logs/*
+Data/*
+Files to test for redundancy/*
+liongard_com/*
