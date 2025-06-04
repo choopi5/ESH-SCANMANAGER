@@ -135,7 +135,7 @@ def send_ports_to_api(project_id, file_path='ports.txt'):
             "ip_address": port_info['ip'],
             "port": port_info['port'],
             "organization_id": project_id,
-            "status": "active",
+            "status": "open",
             "notes": f"Added via API - Project ID: {project_id}"
         })
     
@@ -461,6 +461,108 @@ def send_alive_to_api(project_id, file_path='alive.txt'):
         print(f"Unexpected error: {str(e)}")
         print(f"Error type: {type(e)}")
 
+def send_sensitive_ports_to_api(project_id, file_path='sensitive_ports.txt'):
+    print(f"\n{'='*80}")
+    print("SENDING SENSITIVE PORTS REQUEST")
+    print(f"{'='*80}")
+    
+    # Get absolute path if relative path is provided
+    abs_file_path = os.path.abspath(file_path)
+    server_url = API_BASE_URL
+    
+    # Read sensitive ports from file
+    try:
+        with open(abs_file_path, 'r') as file:
+            # Read lines and strip whitespace
+            port_lines = [line.strip() for line in file.readlines()]
+            # Remove any empty lines
+            port_lines = [line for line in port_lines if line]
+            
+            # Parse IP:PORT:SERVICE format
+            ports = []
+            for line in port_lines:
+                if ':' in line:
+                    parts = line.split(':')
+                    if len(parts) >= 2:
+                        ip = parts[0].strip()
+                        port = parts[1].strip()
+                        service = parts[2].strip() if len(parts) > 2 else "unknown"
+                        ports.append({
+                            'ip': ip,
+                            'port': port,
+                            'service': service
+                        })
+                else:
+                    print(f"Warning: Skipping invalid port format: {line}")
+    except Exception as e:
+        print(f"Error reading file {abs_file_path}: {e}")
+        return
+
+    # Prepare API request
+    url = server_url + "ports.php?bulk=1"
+    
+    # Prepare batch payload
+    port_list = []
+    for port_info in ports:
+        port_list.append({
+            "ip_address": port_info['ip'],
+            "port": port_info['port'],
+            "is_sensitive": True,
+            "organization_id": project_id,
+            "status": "open",
+            "service": port_info['service']
+        })
+    
+    payload = {
+        "ports": port_list
+    }
+    
+    headers = {
+        'X-API-Key': API_KEY,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    }
+
+    # Print complete request details
+    print("\nREQUEST DETAILS:")
+    print(f"URL: {url}")
+    print("\nHEADERS:")
+    for key, value in headers.items():
+        print(f"{key}: {value}")
+    print("\nPAYLOAD:")
+    print(json.dumps(payload, indent=2))
+    print(f"\nTotal sensitive ports being sent: {len(port_list)}")
+    print(f"{'='*80}\n")
+
+    # Send request
+    try:
+        response = requests.put(url, headers=headers, json=payload, verify=False)
+        
+        # Print response details
+        print("\nRESPONSE DETAILS:")
+        print(f"Status Code: {response.status_code}")
+        print("\nResponse Headers:")
+        for key, value in response.headers.items():
+            print(f"{key}: {value}")
+        print("\nResponse Body:")
+        print(response.text)
+        print(f"{'='*80}\n")
+        
+        if response.status_code in [200, 201]:
+            print(f"Successfully sent {len(port_list)} sensitive ports to API")
+        else:
+            print(f"Failed to send sensitive ports. Status code: {response.status_code}")
+    
+    except requests.exceptions.RequestException as e:
+        print(f"Request Error: {str(e)}")
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"Error Response Status: {e.response.status_code}")
+            print(f"Error Response Headers: {json.dumps(dict(e.response.headers), indent=2)}")
+            print(f"Error Response Content: {e.response.text}")
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")
+        print(f"Error type: {type(e)}")
+
 if __name__ == "__main__":
     # Check if both project_id and folder path are provided
     if len(sys.argv) != 3:
@@ -471,15 +573,16 @@ if __name__ == "__main__":
     folder_path = sys.argv[2]
 
     # Construct file paths
-    ips_file = os.path.join(folder_path, 'ips.txt')
-    ports_file = os.path.join(folder_path, 'ports.txt')
-    subdomains_file = os.path.join(folder_path, 'subdomains.txt')
-    apis_file = os.path.join(folder_path, 'api.txt')
-    alive_file = os.path.join(folder_path, 'alive.txt')
+    ips_file = os.path.join(folder_path, './Data/ips.txt')
+    ports_file = os.path.join(folder_path, './Data/ports.txt')
+    sensitive_ports_file = os.path.join(folder_path, './Data/sensitive_ports.txt')
+    subdomains_file = os.path.join(folder_path, './Data/subdomains.txt')
+    apis_file = os.path.join(folder_path, './Data/api.txt')
+    alive_file = os.path.join(folder_path, './Data/alive.txt')
 
     # Send data from each file
     if os.path.exists(ips_file):
-        send_ips_to_api(project_id, ips_file)
+        #send_ips_to_api(project_id, ips_file)
         i=5;
     else:
         print(f"Warning: {ips_file} not found")
@@ -490,20 +593,26 @@ if __name__ == "__main__":
     else:
         print(f"Warning: {ports_file} not found")
 
+    if os.path.exists(sensitive_ports_file):
+        send_sensitive_ports_to_api(project_id, sensitive_ports_file)
+        i=5;
+    else:
+        print(f"Warning: {sensitive_ports_file} not found")
+
     if os.path.exists(subdomains_file):
-        send_subdomains_to_api(project_id, subdomains_file)
+        #send_subdomains_to_api(project_id, subdomains_file)
         i=5;
     else:
         print(f"Warning: {subdomains_file} not found")
 
     if os.path.exists(apis_file):
-        send_apis_to_api(project_id, apis_file)
+        #send_apis_to_api(project_id, apis_file)
         i=5;
     else:
         print(f"Warning: {apis_file} not found")
 
     if os.path.exists(alive_file):
-        send_alive_to_api(project_id, alive_file)
+        #send_alive_to_api(project_id, alive_file)
         i=5;
     else:
         print(f"Warning: {alive_file} not found") 
