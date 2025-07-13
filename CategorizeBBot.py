@@ -2,14 +2,43 @@ import re
 import json
 from pathlib import Path
 import os
+import sys
 
-# Get the current script's directory
-script_dir = Path(os.path.dirname(os.path.abspath(__file__)))
+# Check if folder path is provided
+if len(sys.argv) != 2:
+    print("Usage: python CategorizeBBot.py <folder_path>")
+    print("Example: python CategorizeBBot.py D:\\Ranger\\Scanner Environment\\ltimindtree_com\\leads")
+    sys.exit(1)
 
-# Load files using relative paths
-findings_text = (script_dir / "Data/bbot_findings.txt").read_text()
-github_text = (script_dir / "Data/bbot_github.txt").read_text()
-social_text = (script_dir / "Data/bbot_social.txt").read_text()
+folder_path = sys.argv[1]
+
+# Construct file paths
+findings_file = os.path.join(folder_path, 'bbot_findings.txt')
+github_file = os.path.join(folder_path, 'bbot_github.txt')
+social_file = os.path.join(folder_path, 'bbot_social.txt')
+
+# Check if input files exist
+if not os.path.exists(findings_file):
+    print(f"Error: {findings_file} not found")
+    sys.exit(1)
+
+if not os.path.exists(github_file):
+    print(f"Error: {github_file} not found")
+    sys.exit(1)
+
+if not os.path.exists(social_file):
+    print(f"Error: {social_file} not found")
+    sys.exit(1)
+
+print(f"Processing files from: {folder_path}")
+print(f"- Reading findings from: {findings_file}")
+print(f"- Reading GitHub data from: {github_file}")
+print(f"- Reading social data from: {social_file}")
+
+# Load files
+findings_text = open(findings_file, 'r').read()
+github_text = open(github_file, 'r').read()
+social_text = open(social_file, 'r').read()
 
 # Define patterns
 cve_pattern = re.compile(r"CVE-\d{4}-\d+")
@@ -79,12 +108,18 @@ for line in social_text.splitlines():
 vulnerabilities = [entry for entry in categorized if entry['type'] == 'vulnerability']
 attack_surface = [entry for entry in categorized if entry['type'] == 'attack_surface']
 
-# Output to JSON files using relative paths
-vuln_path = script_dir / "Data/vulnerabilities.json"
-surface_path = script_dir / "Data/attack_surface.json"
+# Output to JSON files
+vuln_path = os.path.join(folder_path, 'vulnerabilities.json')
+surface_path = os.path.join(folder_path, 'attack_surface.json')
 
 with open(vuln_path, "w") as f:
     json.dump(vulnerabilities, f, indent=2)
 
 with open(surface_path, "w") as f:
     json.dump(attack_surface, f, indent=2)
+
+print(f"\nProcessing complete!")
+print(f"- Found {len(vulnerabilities)} vulnerabilities")
+print(f"- Found {len(attack_surface)} attack surface items")
+print(f"- Vulnerabilities saved to: {vuln_path}")
+print(f"- Attack surface saved to: {surface_path}")

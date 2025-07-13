@@ -279,18 +279,27 @@ def process_vulnerabilities(input_file, output_file, organization_id):
         print(f"Error processing vulnerabilities: {str(e)}")
 
 if __name__ == "__main__":
-    # Get script directory
-    script_dir = Path(os.path.dirname(os.path.abspath(__file__)))
+    # Check if folder path is provided
+    if len(sys.argv) != 2:
+        print("Usage: python enrich_vulnerabilities.py <folder_path>")
+        print("Example: python enrich_vulnerabilities.py D:\\Ranger\\Scanner Environment\\ltimindtree_com\\leads")
+        sys.exit(1)
+
+    folder_path = sys.argv[1]
     
-    # File paths
-    input_file = script_dir / "Data/vulnerabilities.json"
-    output_file = script_dir / "Data/enriched_vulnerabilities.json"
+    # Construct file paths
+    input_file = os.path.join(folder_path, 'vulnerabilities.json')
+    output_file = os.path.join(folder_path, 'enriched_vulnerabilities.json')
     
     # Organization ID (you can make this configurable)
     organization_id = 1
     
-    if not input_file.exists():
+    if not os.path.exists(input_file):
         print(f"Error: Input file {input_file} not found")
-        exit(1)
+        print(f"Please ensure vulnerabilities.json exists in {folder_path}")
+        sys.exit(1)
+    
+    print(f"Processing vulnerabilities from: {input_file}")
+    print(f"Output will be saved to: {output_file}")
     
     process_vulnerabilities(input_file, output_file, organization_id) 

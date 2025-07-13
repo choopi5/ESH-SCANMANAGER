@@ -20,10 +20,11 @@ def is_valid_ip(ip):
     except ValueError:
         return False
 
-def get_bulk_location_info(ip_list, batch_size=50):
+def get_bulk_location_info(ip_list, batch_size=10):
     """
-    Get location information for multiple IPs using ipwhois.io bulk endpoint.
+    Get location information for multiple IPs using ipwhois.io API.
     Returns a dictionary mapping IPs to their location data.
+    Note: ipwhois.io doesn't have a bulk endpoint, so we make individual requests.
     """
     results = {}
     default_response = {
@@ -53,77 +54,58 @@ def get_bulk_location_info(ip_list, batch_size=50):
             else:
                 print(f"Info: IP {ip} is private/local")
 
-    # Process IPs in batches
-    for i in range(0, len(valid_ips), batch_size):
-        batch = valid_ips[i:i + batch_size]
-        print(f"\nProcessing batch {i//batch_size + 1} of {(len(valid_ips) + batch_size - 1)//batch_size}")
-        print(f"Batch size: {len(batch)} IPs")
+    print(f"Processing {len(valid_ips)} valid public IPs...")
+    
+    # Process IPs individually (ipwhois.io doesn't support bulk requests)
+    for i, ip in enumerate(valid_ips):
+        print(f"Processing IP {i+1}/{len(valid_ips)}: {ip}")
         
         try:
-            # Make bulk request to ipwhois.io API
-            bulk_url = "https://ipwhois.pro/bulk"
-            headers = {
-                "Content-Type": "application/json"
-            }
+            # Make individual request to ipwhois.io API
+            url = f"https://ipwhois.pro/{ip}"
             params = {
                 "key": "5HWMmlG6osK2fXWX"
             }
             
-            print(f"Sending bulk request for {len(batch)} IPs...")
-            print(f"Request data: {json.dumps(batch)}")
-            
-            response = requests.post(
-                bulk_url,
-                json=batch,  # Send IPs as JSON array
-                headers=headers,
-                params=params
-            )
-            
-            print(f"Response status: {response.status_code}")
+            response = requests.get(url, params=params, timeout=10)
             
             if response.status_code == 200:
-                batch_results = response.json()
-                print(f"Received response for batch")
+                data = response.json()
                 
-                # Process each IP's data from the batch response array
-                for data in batch_results:
-                    ip = data.get("ip")
-                    if ip and data.get("success", False):
-                        results[ip] = {
-                            "country_code": data.get("country_code", "UN"),
-                            "country_name": data.get("country", "Unknown"),
-                            "city": data.get("city", "Unknown"),
-                            "region": data.get("region", "Unknown"),
-                            "latitude": data.get("latitude"),
-                            "longitude": data.get("longitude"),
-                            "isp": data.get("connection", {}).get("isp", "Unknown"),
-                            "org": data.get("connection", {}).get("org", "Unknown"),
-                            "asn": str(data.get("connection", {}).get("asn", "Unknown")),
-                            "asn_name": data.get("connection", {}).get("domain", "Unknown"),
-                            "continent": data.get("continent", "Unknown"),
-                            "continent_code": data.get("continent_code", "UN")
-                        }
-                        print(f"Successfully processed IP: {ip}")
-                    else:
-                        print(f"Warning: Invalid or unsuccessful response for IP {ip if ip else 'Unknown'}")
-                        if ip:
-                            results[ip] = default_response.copy()
-            else:
-                print(f"Warning: Bulk API request failed with status code {response.status_code}")
-                print(f"Error response: {response.text}")
-                for ip in batch:
+                # Check if the response indicates success
+                if data.get("success", True):  # Some APIs return success field
+                    results[ip] = {
+                        "country_code": data.get("country_code", "UN"),
+                        "country_name": data.get("country", "Unknown"),
+                        "city": data.get("city", "Unknown"),
+                        "region": data.get("region", "Unknown"),
+                        "latitude": data.get("latitude"),
+                        "longitude": data.get("longitude"),
+                        "isp": data.get("isp", "Unknown"),
+                        "org": data.get("org", "Unknown"),
+                        "asn": str(data.get("asn", "Unknown")),
+                        "asn_name": data.get("asn_org", "Unknown"),
+                        "continent": data.get("continent", "Unknown"),
+                        "continent_code": data.get("continent_code", "UN")
+                    }
+                    print(f"✓ Successfully processed IP: {ip} -> {data.get('country', 'Unknown')}")
+                else:
+                    print(f"⚠ API returned unsuccessful response for IP: {ip}")
                     results[ip] = default_response.copy()
-
-            # Add a delay between batches to respect rate limits
-            if i + batch_size < len(valid_ips):
-                print(f"Waiting before next batch...")
-                time.sleep(1)
-
-        except Exception as e:
-            print(f"Warning: Error processing batch: {e}")
-            for ip in batch:
+            else:
+                print(f"⚠ API request failed for IP {ip} with status code {response.status_code}")
+                print(f"Response: {response.text}")
                 results[ip] = default_response.copy()
 
+            # Rate limiting - wait between requests
+            if i < len(valid_ips) - 1:  # Don't wait after the last request
+                time.sleep(0.5)  # 500ms delay between requests
+
+        except Exception as e:
+            print(f"⚠ Error processing IP {ip}: {e}")
+            results[ip] = default_response.copy()
+
+    print(f"Completed processing {len(valid_ips)} IPs")
     return results
 
 def get_location_info(ip_address):

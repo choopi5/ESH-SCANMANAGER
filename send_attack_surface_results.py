@@ -8,6 +8,9 @@ import socket
 from ip_location import get_location_info, get_bulk_location_info
 import time
 from config import API_BASE_URL, API_KEY, PROXY_HOST, PROXY_PORT
+from datetime import datetime
+from pathlib import Path
+import re
 
 # Disable InsecureRequestWarning
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -563,6 +566,134 @@ def send_sensitive_ports_to_api(project_id, file_path='sensitive_ports.txt'):
         print(f"Unexpected error: {str(e)}")
         print(f"Error type: {type(e)}")
 
+def send_vulnerabilities_to_api(project_id, file_path='enriched_vulnerabilities.json'):
+    """Send vulnerabilities to the API"""
+    print(f"\n{'='*80}")
+    print("SENDING VULNERABILITIES REQUEST")
+    print(f"{'='*80}")
+    
+    # Get absolute path if relative path is provided
+    abs_file_path = os.path.abspath(file_path)
+    server_url = API_BASE_URL
+    
+    # Read vulnerabilities from file
+    try:
+        with open(abs_file_path, 'r') as file:
+            vulnerabilities = json.load(file)
+    except Exception as e:
+        print(f"Error reading file {abs_file_path}: {e}")
+        return
+
+    # Prepare API request
+    url = server_url + "vulnerabilities.php"
+    
+    # Prepare batch payload
+    vuln_list = []
+    for vuln in vulnerabilities:
+        # Determine endpoint type and value
+        endpoint_type = "subdomain"  # Default to subdomain
+        endpoint_value = vuln.get('host', '')  # Get host from vulnerability data
+        
+        # If no host, try to get from other possible fields
+        if not endpoint_value:
+            endpoint_value = vuln.get('target', '')
+        if not endpoint_value:
+            endpoint_value = vuln.get('domain', '')
+        if not endpoint_value:
+            endpoint_value = vuln.get('ip', '')
+            
+        # If still no endpoint value, skip this vulnerability
+        if not endpoint_value:
+            print(f"Warning: Skipping vulnerability {vuln.get('name', 'Unknown')} - No endpoint value found")
+            continue
+        
+        # If target is an IP address, change endpoint type
+        if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', endpoint_value):
+            endpoint_type = "ip"
+        
+        vuln_list.append({
+            "name": vuln.get('name', ''),
+            "cve_id": vuln.get('cve_id', ''),
+            "severity": vuln.get('severity', 'UNKNOWN'),
+            "status": "Active",  # Default status
+            "description": vuln.get('description', ''),
+            "remediation": vuln.get('remediation', ''),
+            "discovery_date": vuln.get('discovery_date', datetime.now().strftime('%Y-%m-%d')),
+            "organization_id": project_id,
+            "notes": f"Added via API - Project ID: {project_id}",
+            "endpoint_type": endpoint_type,
+            "endpoint_value": endpoint_value
+        })
+    
+    if not vuln_list:
+        print("No valid vulnerabilities to send (all were skipped due to missing endpoint values)")
+        return
+        
+    payload = {
+        "vulnerabilities": vuln_list
+    }
+    
+    headers = {
+        'X-API-Key': API_KEY,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    }
+
+    # Print complete request details
+    print("\nREQUEST DETAILS:")
+    print(f"URL: {url}")
+    print("\nHEADERS:")
+    for key, value in headers.items():
+        print(f"{key}: {value}")
+    print("\nPAYLOAD:")
+    print(json.dumps(payload, indent=2))
+    print(f"\nTotal vulnerabilities being sent: {len(vuln_list)}")
+    print(f"{'='*80}\n")
+
+    # Send request
+    try:
+        response = requests.post(url, headers=headers, json=payload, verify=False)
+        
+        # Print response details
+        print("\nRESPONSE DETAILS:")
+        print(f"Status Code: {response.status_code}")
+        print("\nResponse Headers:")
+        for key, value in response.headers.items():
+            print(f"{key}: {value}")
+        print("\nResponse Body:")
+        print(response.text)
+        print(f"{'='*80}\n")
+        
+        if response.status_code in [200, 201]:
+            print(f"Successfully sent {len(vuln_list)} vulnerabilities to API")
+        else:
+            print(f"Failed to send vulnerabilities. Status code: {response.status_code}")
+            if response.status_code == 500:
+                print("Server error (500) - The server encountered an internal error.")
+                print("This could be due to:")
+                print("1. Invalid request format")
+                print("2. Server-side processing error")
+                print("3. Database connection issues")
+            elif response.status_code == 401:
+                print("Unauthorized (401) - Check your API key")
+            elif response.status_code == 403:
+                print("Forbidden (403) - You don't have permission to access this resource")
+            elif response.status_code == 404:
+                print("Not Found (404) - The API endpoint might be incorrect")
+            print("\nPlease check the response for error details.")
+    
+    except requests.exceptions.RequestException as e:
+        print("\n❌ Connection Error!")
+        print(f"Error: {str(e)}")
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"Response Status: {e.response.status_code}")
+            print(f"Response Headers: {json.dumps(dict(e.response.headers), indent=2)}")
+            print(f"Response Content: {e.response.text}")
+    except Exception as e:
+        print("\n❌ Unexpected Error!")
+        print(f"Error: {str(e)}")
+        print(f"Error type: {type(e)}")
+
 if __name__ == "__main__":
     # Check if both project_id and folder path are provided
     if len(sys.argv) != 3:
@@ -573,16 +704,17 @@ if __name__ == "__main__":
     folder_path = sys.argv[2]
 
     # Construct file paths
-    ips_file = os.path.join(folder_path, './Data/ips.txt')
-    ports_file = os.path.join(folder_path, './Data/ports.txt')
-    sensitive_ports_file = os.path.join(folder_path, './Data/sensitive_ports.txt')
-    subdomains_file = os.path.join(folder_path, './Data/subdomains.txt')
-    apis_file = os.path.join(folder_path, './Data/api.txt')
-    alive_file = os.path.join(folder_path, './Data/alive.txt')
+    ips_file = os.path.join(folder_path, './ips.txt')
+    ports_file = os.path.join(folder_path, './ports.txt')
+    sensitive_ports_file = os.path.join(folder_path, './sensitive_ports.txt')
+    subdomains_file = os.path.join(folder_path, './subdomains.txt')
+    apis_file = os.path.join(folder_path, './api.txt')
+    alive_file = os.path.join(folder_path, './alive.txt')
+    vulnerabilities_file = os.path.join(folder_path, './enriched_vulnerabilities.json')
 
     # Send data from each file
     if os.path.exists(ips_file):
-        #send_ips_to_api(project_id, ips_file)
+        send_ips_to_api(project_id, ips_file)
         i=5;
     else:
         print(f"Warning: {ips_file} not found")
@@ -600,19 +732,25 @@ if __name__ == "__main__":
         print(f"Warning: {sensitive_ports_file} not found")
 
     if os.path.exists(subdomains_file):
-        #send_subdomains_to_api(project_id, subdomains_file)
+        send_subdomains_to_api(project_id, subdomains_file)
         i=5;
     else:
         print(f"Warning: {subdomains_file} not found")
 
     if os.path.exists(apis_file):
-        #send_apis_to_api(project_id, apis_file)
+        send_apis_to_api(project_id, apis_file)
         i=5;
     else:
         print(f"Warning: {apis_file} not found")
 
     if os.path.exists(alive_file):
-        #send_alive_to_api(project_id, alive_file)
+        send_alive_to_api(project_id, alive_file)
         i=5;
     else:
         print(f"Warning: {alive_file} not found") 
+
+    if os.path.exists(vulnerabilities_file):
+        #send_vulnerabilities_to_api(project_id, vulnerabilities_file)
+        i=5;
+    else:
+        print(f"Warning: {vulnerabilities_file} not found") 
