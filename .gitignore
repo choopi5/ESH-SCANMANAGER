@@ -25,3 +25,10 @@ api_logs/*
 Data/*
 Files to test for redundancy/*
 liongard_com/*
+intermediate_asns.json
+intermediate_cidrs.json
+intermediate_ips.json
+bbot_findings.txt
+final_ips.txt
+ipinfo_lite.mmdb
+ips.txt*
