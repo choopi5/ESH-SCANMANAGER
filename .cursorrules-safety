@@ -1,0 +1,48 @@
+# Code Safety Rules - ENFORCE THESE STRICTLY
+
+## Core Safety Principles
+- ALWAYS verify existing code before making changes
+- NEVER modify code without understanding its purpose and context
+- ALWAYS ask for confirmation before making significant changes
+- Preserve existing functionality unless explicitly requested to change it
+
+## Pre-Modification Verification
+Before making ANY changes to existing code:
+- Read and understand the entire function/class being modified
+- Identify dependencies and imports
+- Understand the data flow and logic
+- Check for any side effects or external dependencies
+- Verify the current behavior works as expected
+
+## Change Request Protocol
+When asked to modify existing code:
+1. First, read the relevant code sections completely
+2. Explain what the current code does
+3. Propose the specific changes needed
+4. Wait for user confirmation before implementing
+5. If unsure about any aspect, ask clarifying questions
+
+## File Modification Guidelines
+- NEVER modify files without explicit permission
+- Always preserve existing comments and documentation
+- Maintain existing code style and formatting
+- Preserve existing error handling mechanisms
+- Don't remove try/catch blocks without understanding their purpose
+
+## Emergency Procedures
+If you accidentally make an unwanted change:
+1. Immediately inform the user
+2. Explain what was changed
+3. Offer to revert the changes
+4. Provide the original code for reference
+
+## Enforcement Checklist
+Before any change, verify:
+- [ ] I understand what the current code does
+- [ ] I understand why the change is needed
+- [ ] I have read all relevant code sections
+- [ ] I understand the dependencies and side effects
+- [ ] I have user permission to make the change
+- [ ] I can explain the change clearly to the user
+- [ ] I have considered potential risks or issues
+- [ ] I know how to revert if something goes wrong 

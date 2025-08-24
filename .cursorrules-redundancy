@@ -1,0 +1,27 @@
+# Anti-Redundancy Rules - ENFORCE THESE STRICTLY
+
+## Core Anti-Redundancy Principles
+- NEVER create multiple files with the same functionality
+- ALWAYS check existing files before creating new ones
+- Prefer enhancing existing files over creating new ones
+- Consolidate similar functionality into single, well-designed files
+
+## File Creation Rules
+- Before creating any new file, check if existing files can be enhanced
+- If creating a new file, explain why existing files cannot be used
+- Ask user preference: "Should I enhance the existing file or create a new one?"
+- When creating generic versions, remove specific versions to avoid duplication
+
+## Code Duplication Prevention
+- Check for similar functionality in existing files
+- Identify if there is similar functionality you can imitate
+- Avoid creating multiple versions of the same functionality
+- Prefer modifying existing files over creating new ones
+
+## Enforcement Checklist
+Before creating any file, verify:
+- [ ] I have checked all existing files for similar functionality
+- [ ] No existing file can be enhanced to provide this functionality
+- [ ] I have explained why a new file is necessary
+- [ ] I am not duplicating existing code or functionality
+- [ ] This new file serves a unique purpose not covered elsewhere 

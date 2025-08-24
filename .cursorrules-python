@@ -1,0 +1,38 @@
+# Python-Specific Rules - ENFORCE THESE STRICTLY
+
+## Python Code Preservation
+- Preserve existing type hints
+- Maintain existing exception handling patterns
+- Don't change existing class inheritance
+- Preserve existing method signatures
+- Keep existing property decorators and descriptors
+
+## Import and Dependency Safety
+- NEVER remove imports without verifying they're unused
+- Check for dynamic imports or conditional imports
+- Verify that new imports don't conflict with existing ones
+- Maintain existing import organization and style
+
+## Configuration and Constants
+- NEVER modify configuration values without explicit permission
+- Preserve existing constants and magic numbers unless specifically asked to change
+- Don't change API endpoints, keys, or connection strings
+- Maintain existing environment variable usage
+
+## Testing and Validation
+Before making changes, consider how they might affect:
+- Unit tests
+- Integration tests
+- Manual testing procedures
+- Documentation
+- If tests exist, read them to understand expected behavior
+
+## Enforcement Checklist
+Before any Python change, verify:
+- [ ] I have preserved all existing type hints
+- [ ] I have maintained existing exception handling patterns
+- [ ] I have not changed existing class inheritance
+- [ ] I have preserved existing method signatures
+- [ ] I have not removed any imports without verification
+- [ ] I have not changed any configuration values
+- [ ] I have considered the impact on existing tests 

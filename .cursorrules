@@ -1,0 +1,14 @@
+# Cursor Rules - Main Configuration
+# This file references the specific rule sets below
+
+# Core rules for safe code modification
+.cursorrules-safety
+
+# Token efficiency and performance rules  
+.cursorrules-efficiency
+
+# Anti-redundancy and file management rules
+.cursorrules-redundancy
+
+# Language-specific rules
+.cursorrules-python 

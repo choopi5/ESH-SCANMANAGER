@@ -1,0 +1,34 @@
+# Token Efficiency Rules - ENFORCE THESE STRICTLY
+
+## Core Efficiency Principles
+- NEVER create temporary files for simple text changes
+- ALWAYS make direct edits to target files when possible
+- Use precise line ranges when reading files (don't read entire files unnecessarily)
+- Prefer single tool calls over multiple sequential calls
+
+## Tool Usage Rules
+- For simple text replacements, use direct edit_file over complex regex patterns
+- Avoid creating intermediate scripts for straightforward changes
+- When making changes, use the minimum number of tool calls possible
+- If a change requires more than 3 tool calls, reconsider the approach
+- Always ask: "Can this be done with a single direct edit?"
+
+## File Reading Rules
+- Read only the specific lines needed for the change
+- Use start_line_one_indexed and end_line_one_indexed_inclusive for precision
+- Never read entire files unless absolutely necessary
+- Prefer reading 10-50 lines over 100+ lines
+
+## Change Implementation Rules
+- Make changes directly in the target file
+- Use search_replace only when the change is complex
+- For simple line replacements, use edit_file with precise line ranges
+- Avoid creating helper scripts or temporary files
+
+## Enforcement Checklist
+Before any change, verify:
+- [ ] I can make this change with 1-2 tool calls maximum
+- [ ] I am reading only the specific lines needed
+- [ ] I am making a direct edit to the target file
+- [ ] I am not creating any temporary or helper files
+- [ ] This change cannot be done more efficiently 

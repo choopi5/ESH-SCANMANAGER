@@ -22,6 +22,23 @@ def get_nvd_api_key():
         
     return None
 
+def normalize_severity(severity):
+    """Normalize severity to proper case for API compatibility"""
+    if not severity:
+        return "Unknown"
+    
+    severity_lower = severity.lower()
+    if severity_lower in ['critical']:
+        return "Critical"
+    elif severity_lower in ['high']:
+        return "High"
+    elif severity_lower in ['medium']:
+        return "Medium"
+    elif severity_lower in ['low']:
+        return "Low"
+    else:
+        return "Unknown"
+
 def calculate_severity_from_cvss(cvss_v3_score=None, cvss_v2_score=None):
     """Calculate severity based on CVSS scores"""
     # Prefer CVSS v3 if available
@@ -30,15 +47,15 @@ def calculate_severity_from_cvss(cvss_v3_score=None, cvss_v2_score=None):
     elif cvss_v2_score is not None:
         score = cvss_v2_score
     else:
-        return "UNKNOWN"
+        return "Unknown"
     
-    # Convert score to severity (only HIGH, MEDIUM, LOW)
+    # Convert score to severity (proper case to match API requirements)
     if score >= 7.0:
-        return "HIGH"
+        return "High"
     elif score >= 4.0:
-        return "MEDIUM"
+        return "Medium"
     else:
-        return "LOW"
+        return "Low"
 
 def get_nvd_data(cve_id, api_key=None, max_retries=3, retry_delay=5):
     """Fetch CVE data from NVD API with retry logic"""
@@ -94,6 +111,9 @@ def get_nvd_data(cve_id, api_key=None, max_retries=3, retry_delay=5):
                     cvss_v3.get('baseScore') if cvss_v3 else None,
                     cvss_v2.get('baseScore') if cvss_v2 else None
                 )
+            
+            # Normalize severity to proper case
+            severity = normalize_severity(severity)
             
             # Get description
             description = None
@@ -171,6 +191,9 @@ def get_nvd_data_bulk(cve_ids, api_key=None):
                 severity = cvss_v3.get('baseSeverity', 'UNKNOWN')
             elif cvss_v2:
                 severity = cvss_v2.get('baseSeverity', 'UNKNOWN')
+            
+            # Normalize severity to proper case
+            severity = normalize_severity(severity)
             
             # Get description
             description = None
