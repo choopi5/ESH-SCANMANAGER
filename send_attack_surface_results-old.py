@@ -325,7 +325,7 @@ def send_ips_to_api(project_id, file_path='ips.txt'):
         print(f"🔄 To resume, use: send_cached_ips_to_api('{cache_file}')")
         return False
 
-def send_ports_to_api(project_id, file_path='ports.txt'):
+def send_ports_to_api(project_id, file_path='ports.txt', chunk_size=400):
     print(f"\n{'='*80}")
     print("SENDING PORTS REQUEST")
     print(f"{'='*80}")
@@ -356,23 +356,54 @@ def send_ports_to_api(project_id, file_path='ports.txt'):
     except Exception as e:
         print(f"Error reading file {abs_file_path}: {e}")
         return False
+    
+    if not ports:
+        print("No valid ports found in file")
+        return False
+    
+    # Extract unique IPs for location lookup
+    unique_ips = list(set([port_info['ip'] for port_info in ports]))
+    print(f"Getting location data for {len(unique_ips)} unique IPs...")
+    
+    # Get location data for all IPs in bulk
+    locations = get_bulk_location_info(unique_ips, batch_size=100)
+    
     # Prepare API request
     url = server_url + "ports.php"
     
-    # Prepare batch payload
+    # Prepare batch payload with location data
     port_list = []
     for port_info in ports:
+        ip = port_info['ip']
+        location = locations.get(ip, {})
+        
         port_list.append({
-            "ip_address": port_info['ip'],
+            "ip_address": ip,
             "port": port_info['port'],
+            "country_code": location.get("country_code", "UN"),
+            "country_name": location.get("country_name", "Unknown"),
+            "city": location.get("city", "Unknown"),
+            "region": location.get("region", "Unknown"),
+            "latitude": location.get("latitude"),
+            "longitude": location.get("longitude"),
+            "isp": location.get("isp", "Unknown"),
+            "org": location.get("org", "Unknown"),
+            "asn": location.get("asn", "Unknown"),
+            "asn_name": location.get("asn_name", "Unknown"),
+            "continent": location.get("continent", "Unknown"),
+            "continent_code": location.get("continent_code", "UN"),
             "organization_id": project_id,
             "status": "open",
             "notes": f"Added via API - Project ID: {project_id}"
         })
     
-    payload = {
-        "ports": port_list
-    }
+    # Split ports into chunks
+    total_ports = len(port_list)
+    chunks = [port_list[i:i + chunk_size] for i in range(0, total_ports, chunk_size)]
+    
+    print(f"Total ports to send: {total_ports}")
+    print(f"Chunk size: {chunk_size}")
+    print(f"Number of chunks: {len(chunks)}")
     
     headers = {
         'X-API-Key': API_KEY,
@@ -380,49 +411,66 @@ def send_ports_to_api(project_id, file_path='ports.txt'):
         'Accept': 'application/json'
     }
 
-    # Print complete request details
-    print("\nREQUEST DETAILS:")
-    print(f"URL: {url}")
-    print("\nHEADERS:")
-    for key, value in headers.items():
-        print(f"{key}: {value}")
-    print("\nPAYLOAD:")
-    print(json.dumps(payload, indent=2))
-    print(f"\nTotal ports being sent: {len(port_list)}")
-    print(f"{'='*80}\n")
-
-    # Send request
-    try:
-        response = requests.post(url, headers=headers, json=payload, verify=False)
-        
-        # Print response details
-        print("\nRESPONSE DETAILS:")
-        print(f"Status Code: {response.status_code}")
-        print("\nResponse Headers:")
-        for key, value in response.headers.items():
-            print(f"{key}: {value}")
-        print("\nResponse Body:")
-        print(response.text)
-        print(f"{'='*80}\n")
-        
-        if response.status_code in [200, 201]:
-            print(f"Successfully sent {len(port_list)} ports to API")
-            return True
-        else:
-            print(f"Failed to send ports. Status code: {response.status_code}")
-            return False
+    # Send each chunk
+    successful_chunks = 0
+    failed_chunks = 0
     
-    except requests.exceptions.RequestException as e:
-        print(f"Request Error: {str(e)}")
-        if hasattr(e, 'response') and e.response is not None:
-            print(f"Error Response Status: {e.response.status_code}")
-            print(f"Error Response Headers: {json.dumps(dict(e.response.headers), indent=2)}")
-            print(f"Error Response Content: {e.response.text}")
-        return False
-    except Exception as e:
-        print(f"Unexpected error: {str(e)}")
-        print(f"Error type: {type(e)}")
-        return False
+    for i, chunk in enumerate(chunks, 1):
+        print(f"\n{'='*60}")
+        print(f"SENDING CHUNK {i}/{len(chunks)} ({len(chunk)} ports)")
+        print(f"{'='*60}")
+        
+        payload = {
+            "ports": chunk
+        }
+        
+        # Print chunk details
+        print(f"Chunk {i} details:")
+        print(f"URL: {url}")
+        print(f"Ports in this chunk: {len(chunk)}")
+        
+        # Send request for this chunk
+        try:
+            response = requests.post(url, headers=headers, json=payload, verify=False)
+            
+            # Print response details
+            print(f"Status Code: {response.status_code}")
+            print(f"Response: {response.text}")
+            
+            if response.status_code in [200, 201]:
+                print(f"✅ Successfully sent chunk {i} with {len(chunk)} ports")
+                successful_chunks += 1
+            else:
+                print(f"❌ Failed to send chunk {i}. Status code: {response.status_code}")
+                failed_chunks += 1
+        
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Request Error for chunk {i}: {str(e)}")
+            if hasattr(e, 'response') and e.response is not None:
+                print(f"Error Response Status: {e.response.status_code}")
+                print(f"Error Response Content: {e.response.text}")
+            failed_chunks += 1
+        except Exception as e:
+            print(f"❌ Unexpected error for chunk {i}: {str(e)}")
+            failed_chunks += 1
+        
+        # Add a small delay between chunks to avoid overwhelming the server
+        if i < len(chunks):
+            print("Waiting 1 second before next chunk...")
+            import time
+            time.sleep(1)
+    
+    print(f"\n{'='*80}")
+    print("PORTS SENDING SUMMARY")
+    print(f"{'='*80}")
+    print(f"Total chunks: {len(chunks)}")
+    print(f"Successful chunks: {successful_chunks}")
+    print(f"Failed chunks: {failed_chunks}")
+    print(f"Total ports sent: {successful_chunks * chunk_size}")
+    print(f"Total ports failed: {failed_chunks * chunk_size}")
+    
+    # Return True if at least one chunk was successful
+    return successful_chunks > 0
 
 def send_subdomains_to_api(project_id, file_path='subdomains.txt'):
     # Get absolute path if relative path is provided
@@ -702,7 +750,7 @@ def send_alive_to_api(project_id, file_path='alive.txt'):
         print(f"Error type: {type(e)}")
         return False
 
-def send_sensitive_ports_to_api(project_id, file_path='sensitive_ports.txt'):
+def send_sensitive_ports_to_api(project_id, file_path='sensitive_ports.txt', chunk_size=400):
     print(f"\n{'='*80}")
     print("SENDING SENSITIVE PORTS REQUEST")
     print(f"{'='*80}")
@@ -738,24 +786,54 @@ def send_sensitive_ports_to_api(project_id, file_path='sensitive_ports.txt'):
     except Exception as e:
         print(f"Error reading file {abs_file_path}: {e}")
         return False
+    if not ports:
+        print("No valid sensitive ports found in file")
+        return False
+    
+    # Extract unique IPs for location lookup
+    unique_ips = list(set([port_info['ip'] for port_info in ports]))
+    print(f"Getting location data for {len(unique_ips)} unique IPs...")
+    
+    # Get location data for all IPs in bulk
+    locations = get_bulk_location_info(unique_ips, batch_size=100)
+    
     # Prepare API request
     url = server_url + "ports.php?bulk=1"
     
-    # Prepare batch payload
+    # Prepare batch payload with location data
     port_list = []
     for port_info in ports:
+        ip = port_info['ip']
+        location = locations.get(ip, {})
+        
         port_list.append({
-            "ip_address": port_info['ip'],
+            "ip_address": ip,
             "port": port_info['port'],
             "is_sensitive": True,
+            "country_code": location.get("country_code", "UN"),
+            "country_name": location.get("country_name", "Unknown"),
+            "city": location.get("city", "Unknown"),
+            "region": location.get("region", "Unknown"),
+            "latitude": location.get("latitude"),
+            "longitude": location.get("longitude"),
+            "isp": location.get("isp", "Unknown"),
+            "org": location.get("org", "Unknown"),
+            "asn": location.get("asn", "Unknown"),
+            "asn_name": location.get("asn_name", "Unknown"),
+            "continent": location.get("continent", "Unknown"),
+            "continent_code": location.get("continent_code", "UN"),
             "organization_id": project_id,
             "status": "open",
             "service": port_info['service']
         })
     
-    payload = {
-        "ports": port_list
-    }
+    # Split ports into chunks
+    total_ports = len(port_list)
+    chunks = [port_list[i:i + chunk_size] for i in range(0, total_ports, chunk_size)]
+    
+    print(f"Total sensitive ports to send: {total_ports}")
+    print(f"Chunk size: {chunk_size}")
+    print(f"Number of chunks: {len(chunks)}")
     
     headers = {
         'X-API-Key': API_KEY,
@@ -763,46 +841,66 @@ def send_sensitive_ports_to_api(project_id, file_path='sensitive_ports.txt'):
         'Accept': 'application/json'
     }
 
-    # Print complete request details
-    print("\nREQUEST DETAILS:")
-    print(f"URL: {url}")
-    print("\nHEADERS:")
-    for key, value in headers.items():
-        print(f"{key}: {value}")
-    print("\nPAYLOAD:")
-    print(json.dumps(payload, indent=2))
-    print(f"\nTotal sensitive ports being sent: {len(port_list)}")
-    print(f"{'='*80}\n")
-
-    # Send request
-    try:
-        response = requests.put(url, headers=headers, json=payload, verify=False)
+    # Send each chunk
+    successful_chunks = 0
+    failed_chunks = 0
+    
+    for i, chunk in enumerate(chunks, 1):
+        print(f"\n{'='*60}")
+        print(f"SENDING SENSITIVE PORTS CHUNK {i}/{len(chunks)} ({len(chunk)} ports)")
+        print(f"{'='*60}")
         
-        # Print response details
-        print("\nRESPONSE DETAILS:")
-        print(f"Status Code: {response.status_code}")
-        print("\nResponse Headers:")
-        for key, value in response.headers.items():
-            print(f"{key}: {value}")
-        print("\nResponse Body:")
-        print(response.text)
-        print(f"{'='*80}\n")
+        payload = {
+            "ports": chunk
+        }
         
-        if response.status_code in [200, 201]:
-            print(f"Successfully sent {len(port_list)} sensitive ports to API")
-            return True
-        else:
-            print(f"Failed to send sensitive ports. Status code: {response.status_code}")
-            return False    
-    except requests.exceptions.RequestException as e:
-        print(f"Request Error: {str(e)}")
-        if hasattr(e, 'response') and e.response is not None:
-            print(f"Error Response Status: {e.response.status_code}")
-            print(f"Error Response Headers: {json.dumps(dict(e.response.headers), indent=2)}")
-            print(f"Error Response Content: {e.response.text}")
-    except Exception as e:
-        print(f"Unexpected error: {str(e)}")
-        print(f"Error type: {type(e)}")
+        # Print chunk details
+        print(f"Chunk {i} details:")
+        print(f"URL: {url}")
+        print(f"Sensitive ports in this chunk: {len(chunk)}")
+        
+        # Send request for this chunk
+        try:
+            response = requests.put(url, headers=headers, json=payload, verify=False)
+            
+            # Print response details
+            print(f"Status Code: {response.status_code}")
+            print(f"Response: {response.text}")
+            
+            if response.status_code in [200, 201]:
+                print(f"✅ Successfully sent sensitive ports chunk {i} with {len(chunk)} ports")
+                successful_chunks += 1
+            else:
+                print(f"❌ Failed to send sensitive ports chunk {i}. Status code: {response.status_code}")
+                failed_chunks += 1
+        
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Request Error for sensitive ports chunk {i}: {str(e)}")
+            if hasattr(e, 'response') and e.response is not None:
+                print(f"Error Response Status: {e.response.status_code}")
+                print(f"Error Response Content: {e.response.text}")
+            failed_chunks += 1
+        except Exception as e:
+            print(f"❌ Unexpected error for sensitive ports chunk {i}: {str(e)}")
+            failed_chunks += 1
+        
+        # Add a small delay between chunks to avoid overwhelming the server
+        if i < len(chunks):
+            print("Waiting 1 second before next chunk...")
+            import time
+            time.sleep(1)
+    
+    print(f"\n{'='*80}")
+    print("SENSITIVE PORTS SENDING SUMMARY")
+    print(f"{'='*80}")
+    print(f"Total chunks: {len(chunks)}")
+    print(f"Successful chunks: {successful_chunks}")
+    print(f"Failed chunks: {failed_chunks}")
+    print(f"Total sensitive ports sent: {successful_chunks * chunk_size}")
+    print(f"Total sensitive ports failed: {failed_chunks * chunk_size}")
+    
+    # Return True if at least one chunk was successful
+    return successful_chunks > 0
 
 def send_vulnerabilities_to_api(project_id, file_path='enriched_vulnerabilities.json'):
     """Send vulnerabilities to the API"""
@@ -1328,9 +1426,9 @@ def send_credentials_file_to_api(project_id, file_path='credentials.txt', breach
         return False
 
 
-def create_or_update_organization(project_id, domain_name):
+def create_organization(project_id, domain_name):
     """
-    Create or update organization record in the database
+    Create a new organization using the provided project_id as organization_id.
     """
     try:
         # Clean the domain name to proper naming convention
@@ -1346,12 +1444,17 @@ def create_or_update_organization(project_id, domain_name):
         else:
             domain_tld = domain_name
         
-        # Prepare the organization data
+        # Add current date to the name for multiple runs
+        from datetime import datetime
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        org_name_with_date = f"{domain_name}_{current_date}"
+        
+        # Prepare the organization data - use project_id as organization_id
         org_data = {
-            "id": project_id,
-            "name": domain_name,
+            "organization_id": project_id,  # Use the provided project_id directly
+            "name": org_name_with_date,
             "domain": domain_tld,
-            "subscription_plan": "basic",  # Default plan
+            "subscription_plan": "basic",
             "active": True
         }
         
@@ -1360,10 +1463,10 @@ def create_or_update_organization(project_id, domain_name):
             'X-API-Key': API_KEY
         }
 
-        # Try to create new organization
+        # Create new organization
         server_url = f"{API_BASE_URL}organizations"
         
-        print(f"📤 Creating/updating organization: {domain_tld}")
+        print(f"📤 Creating new organization: {org_name_with_date}")
         print(f"📊 Organization data: {org_data}")
         
         response = requests.post(server_url, json=org_data, headers=headers, verify=False)
@@ -1372,10 +1475,10 @@ def create_or_update_organization(project_id, domain_name):
         print(f"📝 Response Text: {response.text}")
         
         if response.status_code in [200, 201]:
-            print(f"✅ Successfully created/updated organization: {domain_tld}")
+            print(f"✅ Successfully created new organization: {org_name_with_date} with ID: {project_id}")
             return True
         else:
-            print(f"❌ Failed to create/update organization. Status code: {response.status_code}")
+            print(f"❌ Failed to create organization. Status code: {response.status_code}")
             print(f"Response: {response.text}")
             return False
             
@@ -1397,7 +1500,7 @@ if __name__ == "__main__":
         'ips', 'ports', 'sensitive_ports', 'subdomains', 'apis', 
         'alive', 'vulnerabilities', 'bad_tls_assets', 'login_pages', 'credentials'
     ], help='Specific fields to send (default: all available fields)')
-    parser.add_argument('--org-only', action='store_true', help='Only create/update organization, skip attack surface data')
+    parser.add_argument('--org-only', action='store_true', help='Only create new organization, skip attack surface data')
     
     args = parser.parse_args()
     
@@ -1412,11 +1515,11 @@ if __name__ == "__main__":
     print(f"🆔 Project ID: {project_id}")
     print(f"📂 Folder: {folder_path}")
     
-    # Create or update organization record
-    print(f"\n🏢 Creating/updating organization record...")
-    org_success = create_or_update_organization(project_id, project_name)
+    # Create new organization record
+    print(f"\n🏢 Creating new organization record...")
+    org_success = create_organization(project_id, project_name)
     if not org_success:
-        print(f"⚠️  Warning: Failed to create/update organization record, but continuing with attack surface...")
+        print(f"⚠️  Warning: Failed to create organization record, but continuing with attack surface...")
     
     # If --org-only flag is set, exit after organization creation
     if args.org_only:
@@ -1425,8 +1528,8 @@ if __name__ == "__main__":
             sys.exit(0)
         else:
             print(f"❌ Organization creation failed!")
-            sys.exit(1)
-    
+        sys.exit(1)
+
     # Get the project name from the last part of the folder path
     path_parts = Path(folder_path).parts
     project_name = path_parts[-1] if path_parts else "unknown_project"
@@ -1443,10 +1546,20 @@ if __name__ == "__main__":
         # Check if nuclei analyzer script exists
         nuclei_script = 'nuclei_results_analyzer.py'
         if os.path.exists(nuclei_script):
+            print(f"🔍 Running nuclei analyzer on: {folder_path}")
+            
             # Run the nuclei analyzer with the full folder path
+            # Use absolute path for the script and set working directory to script location
+            script_dir = os.path.dirname(os.path.abspath(nuclei_script))
+            script_path = os.path.join(script_dir, nuclei_script)
+            
+            print(f"📁 Script directory: {script_dir}")
+            print(f"📁 Script path: {script_path}")
+            print(f"📁 Working directory: {os.getcwd()}")
+            
             result = subprocess.run([
-                sys.executable, nuclei_script, folder_path
-            ], capture_output=True, text=True, cwd=os.getcwd())
+                sys.executable, script_path, folder_path
+            ], capture_output=True, text=True, cwd=script_dir)
             
             print("Nuclei Analyzer Output:")
             print(result.stdout)
@@ -1458,13 +1571,27 @@ if __name__ == "__main__":
             if result.returncode == 0:
                 print("✅ Nuclei analysis completed successfully")
                 nuclei_success = True
+                
+                # Check if the expected output files were created
+                expected_tls_file = os.path.join(folder_path, 'findings', 'bad_tls_assets.txt')
+                if os.path.exists(expected_tls_file):
+                    file_size = os.path.getsize(expected_tls_file)
+                    print(f"✅ TLS findings file created: {expected_tls_file} ({file_size} bytes)")
+                else:
+                    print(f"⚠ TLS findings file not found: {expected_tls_file}")
+                    
             else:
                 print(f"⚠ Nuclei analysis completed with return code: {result.returncode}")
+                print(f"⚠ This might indicate an issue with the nuclei analysis")
+                print(f"⚠ Command executed: {sys.executable} {script_path} {folder_path}")
+                print(f"⚠ Working directory: {script_dir}")
         else:
             print("⚠ Nuclei analyzer script not found, skipping nuclei analysis")
             
     except Exception as e:
         print(f"❌ Error running nuclei analyzer: {e}")
+        print(f"❌ Error type: {type(e)}")
+        print(f"❌ Error details: {str(e)}")
         print("⚠ Continuing without nuclei analysis...")
     
     print(f"{'='*80}\n")
@@ -1477,7 +1604,7 @@ if __name__ == "__main__":
     apis_file = os.path.join(folder_path, './leads/api.txt')
     alive_file = os.path.join(folder_path, './leads/alive.txt')
     vulnerabilities_file = os.path.join(folder_path, './findings/enriched_vulnerabilities.json')
-    
+
     # New API endpoints file paths
     bad_tls_assets_file = os.path.join(folder_path, './findings/bad_tls_assets.txt')
     login_pages_file = os.path.join(folder_path, './leads/login_pages.txt')
@@ -1508,8 +1635,8 @@ if __name__ == "__main__":
     else:
         print("No specific fields selected - will send all available files")
         # Define which files are required vs optional when sending all
-        required_fields = ['ips', 'ports', 'sensitive_ports', 'subdomains', 'apis', 'alive', 'vulnerabilities', 'bad_tls_assets', 'login_pages']
-        optional_fields = ['credentials']
+        required_fields = ['ips', 'ports', 'sensitive_ports', 'subdomains', 'apis', 'alive', 'vulnerabilities', 'login_pages']
+        optional_fields = ['credentials', 'bad_tls_assets']
         
         files_to_check = [(field_mappings[field][0], field_mappings[field][1]) for field in required_fields + optional_fields if field in field_mappings]
     
@@ -1535,10 +1662,10 @@ if __name__ == "__main__":
             print(f"   - {description}: {file_path}")
         print(f"\n❌ All selected field files must be present before sending. Exiting.")
         sys.exit(1)
-    elif not selected_fields and any(f[1] in ["IP addresses", "Ports", "Sensitive ports", "Subdomains", "APIs", "Alive domains", "Vulnerabilities", "Bad TLS Assets", "Login Pages"] for f in missing_files):
+    elif not selected_fields and any(f[1] in ["IP addresses", "Ports", "Sensitive ports", "Subdomains", "APIs", "Alive domains", "Vulnerabilities", "Login Pages"] for f in missing_files):
         print(f"\n❌ Missing required files. Cannot proceed:")
         for file_path, description in missing_files:
-            if description in ["IP addresses", "Ports", "Sensitive ports", "Subdomains", "APIs", "Alive domains", "Vulnerabilities", "Bad TLS Assets", "Login Pages"]:
+            if description in ["IP addresses", "Ports", "Sensitive ports", "Subdomains", "APIs", "Alive domains", "Vulnerabilities", "Login Pages"]:
                 print(f"   - {description}: {file_path}")
         print(f"\n❌ All required files must be present before sending. Exiting.")
         sys.exit(1)
@@ -1587,7 +1714,7 @@ if __name__ == "__main__":
             else:
                 success = False
                 print(f"❌ Unknown field type: {description}")
-            
+
             if success:
                 results['success'].append(description)
             else:

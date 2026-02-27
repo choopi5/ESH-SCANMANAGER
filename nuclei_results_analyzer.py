@@ -335,8 +335,14 @@ Examples:
     
     args = parser.parse_args()
     
-    # Construct paths based on folder name
-    base_path = f"D:\\Ranger\\Data\\{args.folder_name}"
+    # Construct paths based on folder name or full path
+    if os.path.isabs(args.folder_name):
+        # If full path is provided, use it directly
+        base_path = args.folder_name
+    else:
+        # If just folder name is provided, construct full path
+        base_path = f"D:\\Ranger\\Data\\{args.folder_name}"
+    
     all_results_file = os.path.join(base_path, 'findings', 'nuclei_all_results.txt')
     info_results_file = os.path.join(base_path, 'findings', 'nuclei_info_results.txt')
     output_dir = os.path.join(base_path, 'findings')  # Write to same folder as input
@@ -350,28 +356,39 @@ Examples:
     print(f"Output directory: {output_dir}")
     
     # Check if input files exist
-    if not os.path.exists(all_results_file):
-        print(f"Error: File not found: {all_results_file}")
-        sys.exit(1)
+    files_to_process = []
     
-    if not os.path.exists(info_results_file):
-        print(f"Error: File not found: {info_results_file}")
+    if os.path.exists(all_results_file):
+        files_to_process.append(('all_results', all_results_file))
+        print(f"[+] Found: {all_results_file}")
+    else:
+        print(f"[!] Warning: File not found: {all_results_file}")
+    
+    if os.path.exists(info_results_file):
+        files_to_process.append(('info_results', info_results_file))
+        print(f"[+] Found: {info_results_file}")
+    else:
+        print(f"[!] Warning: File not found: {info_results_file}")
+    
+    if not files_to_process:
+        print(f"[-] No input files found. Exiting.")
         sys.exit(1)
     
     analyzer = NucleiResultsAnalyzer(project_name)
     
-    # Analyze all results file
-    print(f"\nAnalyzing {all_results_file}...")
-    ssl_findings_all, high_priority_all, other_all = analyzer.analyze_file(all_results_file)
+    # Initialize empty results
+    all_ssl_findings = []
+    all_high_priority = []
+    all_other = []
     
-    # Analyze info results file
-    print(f"Analyzing {info_results_file}...")
-    ssl_findings_info, high_priority_info, other_info = analyzer.analyze_file(info_results_file)
-    
-    # Combine results
-    all_ssl_findings = ssl_findings_all + ssl_findings_info
-    all_high_priority = high_priority_all + high_priority_info
-    all_other = other_all + other_info
+    # Analyze only existing files
+    for file_type, file_path in files_to_process:
+        print(f"\nAnalyzing {file_path}...")
+        ssl_findings, high_priority, other = analyzer.analyze_file(file_path)
+        
+        all_ssl_findings.extend(ssl_findings)
+        all_high_priority.extend(high_priority)
+        all_other.extend(other)
     
     # Remove duplicates based on raw_line
     seen_lines = set()

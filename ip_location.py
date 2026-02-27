@@ -4,39 +4,39 @@ import ipaddress
 import time
 import json
 import config
-import socket
+# import socket  # Not needed - SOCKS proxy disabled
 
-# Enforce SOCKS proxy usage - fail if proxy not available
-try:
-    import socks
-    
-    # Set up SOCKS proxy if not already configured
-    if not hasattr(socks, '_orgsocket'):
-        print(f"Info: Configuring SOCKS proxy {config.PROXY_HOST}:{config.PROXY_PORT}")
-        socks.set_default_proxy(socks.SOCKS5, config.PROXY_HOST, config.PROXY_PORT)
-        socket.socket = socks.socksocket
-    
-    print(f"Info: Testing SOCKS proxy connectivity to {config.PROXY_HOST}:{config.PROXY_PORT}...")
-    
-    # Test if proxy is reachable - REQUIRED for operation
-    test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    test_socket.settimeout(5)  # 5 second timeout
-    try:
-        test_socket.connect((config.PROXY_HOST, config.PROXY_PORT))
-        test_socket.close()
-        print(f"✓ SOCKS proxy {config.PROXY_HOST}:{config.PROXY_PORT} is reachable - proceeding")
-    except (ConnectionRefusedError, OSError, socket.timeout) as e:
-        print(f"✗ CRITICAL: SOCKS proxy {config.PROXY_HOST}:{config.PROXY_PORT} is not reachable: {e}")
-        print("  SOCKS proxy is required for operation. Please ensure your proxy server is running.")
-        raise ConnectionError(f"Required SOCKS proxy {config.PROXY_HOST}:{config.PROXY_PORT} is not available")
-        
-except ImportError:
-    print("✗ CRITICAL: SOCKS module not available but required for operation")
-    print("  Please install with: pip install PySocks")
-    raise ImportError("PySocks module is required but not installed")
-except Exception as e:
-    print(f"✗ CRITICAL: Failed to configure SOCKS proxy: {e}")
-    raise
+# SOCKS proxy disabled - not required anymore
+# try:
+#     import socks
+#     
+#     # Set up SOCKS proxy if not already configured
+#     if not hasattr(socks, '_orgsocket'):
+#         print(f"Info: Configuring SOCKS proxy {config.PROXY_HOST}:{config.PROXY_PORT}")
+#         socks.set_default_proxy(socks.SOCKS5, config.PROXY_HOST, config.PROXY_PORT)
+#         socket.socket = socks.socksocket
+#     
+#     print(f"Info: Testing SOCKS proxy connectivity to {config.PROXY_HOST}:{config.PROXY_PORT}...")
+#     
+#     # Test if proxy is reachable - REQUIRED for operation
+#     test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#     test_socket.settimeout(5)  # 5 second timeout
+#     try:
+#         test_socket.connect((config.PROXY_HOST, config.PROXY_PORT))
+#         test_socket.close()
+#         print(f"✓ SOCKS proxy {config.PROXY_HOST}:{config.PROXY_PORT} is reachable - proceeding")
+#     except (ConnectionRefusedError, OSError, socket.timeout) as e:
+#         print(f"✗ CRITICAL: SOCKS proxy {config.PROXY_HOST}:{config.PROXY_PORT} is not reachable: {e}")
+#         print("  SOCKS proxy is required for operation. Please ensure your proxy server is running.")
+#         raise ConnectionError(f"Required SOCKS proxy {config.PROXY_HOST}:{config.PROXY_PORT} is not available")
+#         
+# except ImportError:
+#     print("✗ CRITICAL: SOCKS module not available but required for operation")
+#     print("  Please install with: pip install PySocks")
+#     raise ImportError("PySocks module is required but not installed")
+# except Exception as e:
+#     print(f"✗ CRITICAL: Failed to configure SOCKS proxy: {e}")
+#     raise
 
 # Using ipwhois.pro bulk API for geolocation
 

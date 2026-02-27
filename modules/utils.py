@@ -48,6 +48,52 @@ def extract_ip_from_dns_format(line):
     
     return None
 
+def extract_ip_and_hostname_from_dns_format(line):
+    """
+    Extract both IP address and hostname from DNS resolution output.
+    
+    Common formats:
+    - "hostname.com [A] [1.2.3.4]"
+    - "hostname.com [\x1b[35mA\x1b[0m] [\x1b[32m1.2.3.4\x1b[0m]" (with ANSI colors)
+    - "1.2.3.4" (plain IP, no hostname)
+    
+    Args:
+        line (str): Line of text from DNS resolution
+        
+    Returns:
+        dict: {
+            'ip': str or None,
+            'hostname': str or None
+        }
+    """
+    line = line.strip()
+    result = {'ip': None, 'hostname': None}
+    
+    # Check if it's already a plain IP (no hostname)
+    if is_valid_ip(line):
+        result['ip'] = line
+        return result
+    
+    # Extract IP using existing function
+    ip = extract_ip_from_dns_format(line)
+    if ip:
+        result['ip'] = ip
+        
+        # Try to extract hostname from the beginning of the line
+        # Remove ANSI color codes first
+        clean_line = re.sub(r'\x1b\[[0-9;]*m', '', line)
+        
+        # Common DNS format: "hostname.com [A] [IP]" or "hostname.com [AAAA] [IP]"
+        # Extract everything before the first bracket or space with bracket
+        hostname_match = re.match(r'^([^\s\[]+)', clean_line)
+        if hostname_match:
+            potential_hostname = hostname_match.group(1).strip()
+            # Validate that it looks like a hostname (contains dots and letters)
+            if '.' in potential_hostname and not is_valid_ip(potential_hostname):
+                result['hostname'] = potential_hostname
+    
+    return result
+
 def is_valid_ip(ip_str):
     """
     Check if the string is a valid IPv4 or IPv6 address
@@ -66,30 +112,31 @@ def is_valid_ip(ip_str):
 
 def is_private_ip(ip_str):
     """
-    Check if an IP address is private/local
+    Check if the IP address is private/internal
     
     Args:
         ip_str (str): IP address string
         
     Returns:
-        bool: True if private/local IP, False if public
+        bool: True if private IP, False otherwise
     """
     try:
-        ip_obj = ipaddress.ip_address(ip_str)
-        return ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local
+        ip = ipaddress.ip_address(ip_str)
+        return ip.is_private
     except ValueError:
         return False
 
-def parse_ips_from_file(file_path):
+def parse_ips_from_file(file_path, include_hostname=False):
     """
     Parse IP addresses from a file containing various DNS resolution formats
     
     Args:
         file_path (str): Path to file containing IP data
+        include_hostname (bool): Whether to extract hostname information
         
     Returns:
         dict: {
-            'ips': list of extracted valid IPs,
+            'ips': list of extracted valid IPs (or list of dicts with ip/hostname if include_hostname=True),
             'skipped_lines': list of lines that couldn't be parsed,
             'total_lines': total lines processed,
             'stats': parsing statistics
@@ -102,16 +149,25 @@ def parse_ips_from_file(file_path):
     except Exception as e:
         raise Exception(f"Error reading file {file_path}: {e}")
 
-    # Extract IPs from various formats
+    # Extract IPs (and optionally hostnames) from various formats
     ips = []
     skipped_lines = []
     
     for line in lines:
-        extracted_ip = extract_ip_from_dns_format(line)
-        if extracted_ip:
-            ips.append(extracted_ip)
+        if include_hostname:
+            # Extract both IP and hostname
+            extracted_data = extract_ip_and_hostname_from_dns_format(line)
+            if extracted_data['ip']:
+                ips.append(extracted_data)
+            else:
+                skipped_lines.append(line)
         else:
-            skipped_lines.append(line)
+            # Extract IP only (backward compatibility)
+            extracted_ip = extract_ip_from_dns_format(line)
+            if extracted_ip:
+                ips.append(extracted_ip)
+            else:
+                skipped_lines.append(line)
     
     # Calculate statistics
     total_lines = len(lines)
@@ -165,10 +221,17 @@ def test_ip_parsing():
         ""
     ]
     
+    print("\n1. Testing IP-only extraction:")
     for test_case in test_cases:
         result = extract_ip_from_dns_format(test_case)
         status = "✅ EXTRACTED" if result else "❌ SKIPPED"
         print(f"{status}: '{test_case[:50]}...' -> {result}")
+    
+    print("\n2. Testing IP + Hostname extraction:")
+    for test_case in test_cases:
+        result = extract_ip_and_hostname_from_dns_format(test_case)
+        status = "✅ EXTRACTED" if result['ip'] else "❌ SKIPPED"
+        print(f"{status}: '{test_case[:50]}...' -> IP: {result['ip']}, Hostname: {result['hostname']}")
 
 if __name__ == "__main__":
     test_ip_parsing()
