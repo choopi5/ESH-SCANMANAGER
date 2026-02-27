@@ -37,7 +37,7 @@ def create_organization(project_id, domain_name):
         headers = get_api_headers()
 
         # Create new organization
-        server_url = f"{API_BASE_URL}organizations"
+        server_url = f"{API_BASE_URL}organizations.php"
         
         print(f"[+] Creating new organization: {org_name_with_timestamp}")
         print(f"[*] Organization data: {org_data}")
