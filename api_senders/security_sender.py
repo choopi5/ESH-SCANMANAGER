@@ -157,7 +157,7 @@ def send_login_pages_to_api(project_id, file_path='login_pages.txt'):
     
     # Get absolute path if relative path is provided
     abs_file_path = os.path.abspath(file_path)
-    server_url = f"{API_BASE_URL}login_pages"
+    server_url = f"{API_BASE_URL}login_pages.php"
     
     # Read Login Pages data from file (one URL per line)
     try:
@@ -247,7 +247,7 @@ def send_credentials_to_api(project_id, file_path='credentials.txt', breach_sour
     
     # Get absolute path if relative path is provided
     abs_file_path = os.path.abspath(file_path)
-    server_url = f"{API_BASE_URL}credentials"
+    server_url = f"{API_BASE_URL}credentials.php"
     
     # Read Credentials data from file
     try:
